@@ -134,7 +134,13 @@ def _execute_render(self, context, frame=None):
 
     local_dir = _get_local_output_dir(context)
     local_dir.mkdir(parents=True, exist_ok=True)
-    _start_async_monitor(prefs.host, prefs.remote_dir, job_id, local_dir)
+    _start_async_monitor(
+        prefs.host,
+        prefs.remote_dir,
+        job_id,
+        local_dir,
+        prefs.poll_interval_seconds,
+    )
     self.report(
         {'INFO'}, "Results will automatically download when job finishes.")
 

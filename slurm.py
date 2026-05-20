@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 from pathlib import PurePosixPath
 
-POLL_INTERVAL_SECONDS = 10
 TERMINAL_STATES = {
     "COMPLETED",
     "FAILED",
@@ -25,19 +24,84 @@ _LATEST_QUEUE_INFO = {
     "job_id": "",
     "status": "Idle",
     "elapsed": "0s",
+    "render_status": "",
+    "frame": "",
+    "sample": "",
+    "sample_total": "",
 }
 
 
-def _set_latest_queue_info(job_id: str, status: str, elapsed: str):
+def _set_latest_queue_info(
+    job_id: str,
+    status: str,
+    elapsed: str,
+    render_status: str | None = None,
+    frame: str | None = None,
+    sample: str | None = None,
+    sample_total: str | None = None,
+):
     with _LATEST_QUEUE_INFO_LOCK:
         _LATEST_QUEUE_INFO["job_id"] = job_id
         _LATEST_QUEUE_INFO["status"] = status
         _LATEST_QUEUE_INFO["elapsed"] = elapsed
+        if render_status is not None:
+            _LATEST_QUEUE_INFO["render_status"] = render_status
+        if frame is not None:
+            _LATEST_QUEUE_INFO["frame"] = frame
+        if sample is not None:
+            _LATEST_QUEUE_INFO["sample"] = sample
+        if sample_total is not None:
+            _LATEST_QUEUE_INFO["sample_total"] = sample_total
 
 
 def get_latest_queue_info():
     with _LATEST_QUEUE_INFO_LOCK:
         return dict(_LATEST_QUEUE_INFO)
+
+
+def _parse_render_log_line(line: str):
+    stripped = line.strip()
+    if not stripped:
+        return None
+
+    parts = [field.strip() for field in stripped.split("|")]
+    if len(parts) >= 4:
+        render_status = " | ".join(parts[3:]).strip()
+    else:
+        render_status = stripped
+
+    frame_match = re.search(r"Fra:(\d+)", stripped)
+    sample_match = re.search(r"Sample (\d+)/(\d+)", stripped)
+    tile_match = re.search(r"Rendered (\d+)/(\d+) Tiles", stripped)
+
+    sample = ""
+    sample_total = ""
+    if sample_match:
+        sample = sample_match.group(1)
+        sample_total = sample_match.group(2)
+    elif tile_match:
+        sample = tile_match.group(1)
+        sample_total = tile_match.group(2)
+
+    return {
+        "render_status": render_status,
+        "frame": frame_match.group(1) if frame_match else "",
+        "sample": sample,
+        "sample_total": sample_total,
+    }
+
+
+def _read_latest_render_status(host: str, remote_log_path: str):
+    tail = _read_remote_log_tail(host, remote_log_path, max_lines=120)
+    if not tail:
+        return None
+
+    for line in reversed(tail.splitlines()):
+        parsed = _parse_render_log_line(line)
+        if parsed:
+            return parsed
+
+    return None
 
 
 def _format_slurm_time(time_limit):
@@ -63,7 +127,7 @@ def _build_slurm_script(prefs, blender_cmd: str, context):
 
     return (
         "#!/bin/bash\n"
-        f"#SBATCH --nodes={nodes}\n"
+        "#SBATCH --nodes=1\n"
         f"#SBATCH --ntasks={ntasks}\n"
         f"#SBATCH --cpus-per-task={cpus}\n"
         f"#SBATCH --gres=gpu:{gpus}\n"
@@ -104,7 +168,15 @@ def _submit_job(prefs, slurm_script: str, operator):
     job_id = match.group(1)
     operator.report(
         {'INFO'}, f"Job submitted: {job_id}  |  track with: squeue -j {job_id}")
-    _set_latest_queue_info(job_id, "PENDING", "0s")
+    _set_latest_queue_info(
+        job_id,
+        "PENDING",
+        "0s",
+        render_status="",
+        frame="",
+        sample="",
+        sample_total="",
+    )
     return job_id
 
 
@@ -148,14 +220,29 @@ def _query_job_info(host: str, job_id: str):
     return job_id, "UNKNOWN", "", error_blob.strip() or "Could not determine job state from squeue/sacct."
 
 
-def _monitor_job_and_download(host: str, remote_dir: str, job_id: str, local_dir: Path, start_time: float):
+def _monitor_job_and_download(
+    host: str,
+    remote_dir: str,
+    job_id: str,
+    local_dir: Path,
+    start_time: float,
+    poll_interval_seconds: int,
+):
     query_errors = 0
+    remote_logs_dir = str(PurePosixPath(remote_dir) / "slurm-logs")
+    remote_out = f"{remote_logs_dir}/{job_id}-hpcrender.out"
 
     while True:
         parsed_job_id, state, elapsed, state_error = _query_job_info(
             host, job_id)
+        render_info = _read_latest_render_status(host, remote_out)
         if parsed_job_id:
-            _set_latest_queue_info(parsed_job_id, state, elapsed or "0s")
+            _set_latest_queue_info(
+                parsed_job_id,
+                state,
+                elapsed or "0s",
+                **(render_info or {}),
+            )
         if state in TERMINAL_STATES:
             break
         if state == "UNKNOWN":
@@ -177,7 +264,7 @@ def _monitor_job_and_download(host: str, remote_dir: str, job_id: str, local_dir
                 return
         else:
             query_errors = 0
-        time.sleep(POLL_INTERVAL_SECONDS)
+        time.sleep(max(1, int(poll_interval_seconds)))
 
     # job finished
     from .helpers import _format_duration
@@ -186,7 +273,6 @@ def _monitor_job_and_download(host: str, remote_dir: str, job_id: str, local_dir
     from .helpers import _notify_user
 
     elapsed = _format_duration(time.monotonic() - start_time)
-    remote_logs_dir = str(PurePosixPath(remote_dir) / "slurm-logs")
     remote_out = f"{remote_logs_dir}/{job_id}-hpcrender.out"
     remote_err = f"{remote_logs_dir}/{job_id}-hpcrender.err"
 
@@ -233,10 +319,23 @@ def _monitor_job_and_download(host: str, remote_dir: str, job_id: str, local_dir
     _notify_user("HPC Render Failed", lines, icon="ERROR")
 
 
-def _start_async_monitor(host: str, remote_dir: str, job_id: str, local_dir: Path):
+def _start_async_monitor(
+    host: str,
+    remote_dir: str,
+    job_id: str,
+    local_dir: Path,
+    poll_interval_seconds: int,
+):
     thread = threading.Thread(
         target=_monitor_job_and_download,
-        args=(host, remote_dir, job_id, local_dir, time.monotonic()),
+        args=(
+            host,
+            remote_dir,
+            job_id,
+            local_dir,
+            time.monotonic(),
+            poll_interval_seconds,
+        ),
         daemon=True,
         name=f"HPCRenderMonitor-{job_id}",
     )

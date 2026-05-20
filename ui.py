@@ -35,6 +35,11 @@ class HPC_PT_RenderPanel(bpy.types.Panel):
         layout.operator("hpc.download_renders", icon="IMPORT")
 
         queue_info = get_latest_queue_info()
+        render_status = queue_info.get("render_status", "").strip()
+        frame = queue_info.get("frame", "").strip()
+        sample = queue_info.get("sample", "").strip()
+        sample_total = queue_info.get("sample_total", "").strip()
+
         if queue_info["job_id"]:
             layout.label(
                 text=(
@@ -43,6 +48,18 @@ class HPC_PT_RenderPanel(bpy.types.Panel):
                     f"Job ID: {queue_info['job_id']}"
                 )
             )
+            if render_status:
+                layout.label(text=f"Render: {render_status}")
+            if frame or sample:
+                progress_text = []
+                if frame:
+                    progress_text.append(f"Frame {frame}")
+                if sample:
+                    if sample_total:
+                        progress_text.append(f"Sample {sample}/{sample_total}")
+                    else:
+                        progress_text.append(f"Sample {sample}")
+                layout.label(text="Progress: " + " | ".join(progress_text))
         else:
             layout.label(text="Status: Idle. Elapsed: 0s. Job ID: -")
 

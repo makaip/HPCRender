@@ -41,6 +41,14 @@ class HPCRenderPreferences(bpy.types.AddonPreferences):
         default=True,
     )  # pyright: ignore[reportInvalidTypeForm]
 
+    poll_interval_seconds: bpy.props.IntProperty(
+        name="Poll interval (seconds)",
+        description="How often the add-on refreshes SLURM and render log status",
+        default=10,
+        min=1,
+        max=3600,
+    )  # pyright: ignore[reportInvalidTypeForm]
+
     def draw(self, context):
         layout = self.layout
 
@@ -53,6 +61,7 @@ class HPCRenderPreferences(bpy.types.AddonPreferences):
         layout.separator()
 
         layout.prop(self, "use_gpu")
+        layout.prop(self, "poll_interval_seconds")
 
 
 def get_prefs(context):
