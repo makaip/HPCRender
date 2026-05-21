@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 from pathlib import PurePosixPath
 
+from .helpers import _read_remote_log_tail
+
 TERMINAL_STATES = {
     "COMPLETED",
     "FAILED",
@@ -125,22 +127,102 @@ def _build_slurm_script(prefs, blender_cmd: str, context):
     time_limit = getattr(scene, "hpcrender_time_limit", 21600)
     remote_logs_dir = str(PurePosixPath(prefs.remote_dir) / "slurm-logs")
 
-    return (
-        "#!/bin/bash\n"
-        "#SBATCH --nodes=1\n"
-        f"#SBATCH --ntasks={ntasks}\n"
-        f"#SBATCH --cpus-per-task={cpus}\n"
-        f"#SBATCH --gres=gpu:{gpus}\n"
-        f"#SBATCH --mem={mem}G\n"
-        f"#SBATCH --time={_format_slurm_time(time_limit)}\n"
-        f"#SBATCH --partition={prefs.partition}\n"
-        f"#SBATCH --output={remote_logs_dir}/%j-hpcrender.out\n"
-        f"#SBATCH --error={remote_logs_dir}/%j-hpcrender.err\n"
-        "\n"
-        f"mkdir -p \"{remote_logs_dir}\"\n"
-        f"module load {prefs.cuda_module}\n"
-        f"{blender_cmd}\n"
+    return f"""#!/bin/bash -l
+#SBATCH --nodes=1
+#SBATCH --ntasks={ntasks}
+#SBATCH --cpus-per-task={cpus}
+#SBATCH --gres=gpu:{gpus}
+#SBATCH --mem={mem}G
+#SBATCH --time={_format_slurm_time(time_limit)}
+#SBATCH --partition={prefs.partition}
+#SBATCH --output={remote_logs_dir}/%j-hpcrender.out
+#SBATCH --error={remote_logs_dir}/%j-hpcrender.err
+
+mkdir -p "{remote_logs_dir}"
+module load {prefs.cuda_module}
+{blender_cmd}
+"""
+
+
+def _build_distributed_animation_slurm_script(prefs, blender_cmd: str, context, nodes: int):
+    scene = context.scene
+    cpus = getattr(scene, "hpcrender_cpus", 1)
+    gpus = getattr(scene, "hpcrender_gpus",
+                   prefs.gpus if hasattr(prefs, "gpus") else 1)
+    mem = getattr(scene, "hpcrender_mem", 64)
+    time_limit = getattr(scene, "hpcrender_time_limit", 21600)
+    remote_logs_dir = str(PurePosixPath(prefs.remote_dir) / "slurm-logs")
+    frame_start = int(getattr(scene, "frame_start", 1))
+    frame_end = int(getattr(scene, "frame_end", frame_start))
+    frame_step = max(1, int(getattr(scene, "frame_step", 1)))
+    frame_list = "\n".join(
+        str(frame) for frame in range(frame_start, frame_end + 1, frame_step)
     )
+
+    return f"""#!/bin/bash -l
+#SBATCH --nodes={nodes}
+#SBATCH --ntasks={nodes}
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task={cpus}
+#SBATCH --gres=gpu:{gpus}
+#SBATCH --mem={mem}G
+#SBATCH --time={_format_slurm_time(time_limit)}
+#SBATCH --partition={prefs.partition}
+#SBATCH --output={remote_logs_dir}/%j-hpcrender.out
+#SBATCH --error={remote_logs_dir}/%j-hpcrender.err
+
+mkdir -p "{remote_logs_dir}"
+module load {prefs.cuda_module}
+python_bin="$(command -v python3 || command -v python)"
+if [ -z "$python_bin" ]; then
+    echo "python3/python not found on PATH."
+    exit 1
+fi
+frame_queue="{remote_logs_dir}/${{SLURM_JOB_ID}}-hpcrender-frames.txt"
+cat > "$frame_queue" <<'EOF'
+{frame_list}
+EOF
+
+pop_frame() {{
+    "$python_bin" - "$1" <<'PY'
+import fcntl
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+with path.open("r+", encoding="utf-8") as handle:
+    fcntl.flock(handle, fcntl.LOCK_EX)
+    frames = [line.strip() for line in handle if line.strip()]
+    if not frames:
+        raise SystemExit(0)
+    frame = frames[0]
+    handle.seek(0)
+    handle.truncate(0)
+    handle.write("\\n".join(frames[1:]))
+    if frames[1:]:
+        handle.write("\\n")
+print(frame)
+PY
+}}
+
+worker() {{
+    while true; do
+        frame="$(pop_frame "$frame_queue")"
+        if [ -z "$frame" ]; then
+            break
+        fi
+        echo "Distributed render | Frame:$frame | Node:${{SLURM_NODEID:-unknown}}"
+        {blender_cmd}
+    done
+}}
+
+export -f pop_frame
+export -f worker
+export python_bin
+export frame_queue
+
+srun --kill-on-bad-exit=0 --ntasks={nodes} --ntasks-per-node=1 bash -lc "worker"
+"""
 
 
 def _submit_job(prefs, slurm_script: str, operator):

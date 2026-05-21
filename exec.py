@@ -9,6 +9,10 @@ class HPC_OT_RenderFrame(bpy.types.Operator):
     bl_idname = "hpc.render_frame"
     bl_label = "Render Frame on HPC"
 
+    @classmethod
+    def poll(cls, context):
+        return getattr(context.scene, "hpcrender_nodes", 1) <= 1
+
     def execute(self, context):
         frame = context.scene.frame_current
         self.report({'INFO'}, f"Rendering frame {frame}...")

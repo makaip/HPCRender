@@ -14,10 +14,12 @@ class HPC_PT_RenderPanel(bpy.types.Panel):
         prefs = get_prefs(context)
         layout = self.layout
         scene = context.scene
+        nodes = getattr(scene, "hpcrender_nodes", 1)
 
         col = layout.column(align=True)
         col.label(text=f"Host: {prefs.host}", icon="WORLD")
         col.label(text=f"Partition: {prefs.partition}", icon="DRIVER")
+        col.prop(scene, "hpcrender_nodes")
         col.prop(scene, "hpcrender_gpus")
         col.prop(scene, "hpcrender_ntasks")
         col.prop(scene, "hpcrender_cpus")
@@ -28,9 +30,16 @@ class HPC_PT_RenderPanel(bpy.types.Panel):
 
         layout.separator()
 
-        row = layout.row(align=True)
-        row.operator("hpc.render_frame", icon="RENDER_STILL")
-        row.operator("hpc.render_animation", icon="RENDER_ANIMATION")
+        if nodes > 1:
+            layout.label(
+                text="Multi-node mode renders animations only.",
+                icon="INFO",
+            )
+            layout.operator("hpc.render_animation", icon="RENDER_ANIMATION")
+        else:
+            row = layout.row(align=True)
+            row.operator("hpc.render_frame", icon="RENDER_STILL")
+            row.operator("hpc.render_animation", icon="RENDER_ANIMATION")
 
         layout.operator("hpc.download_renders", icon="IMPORT")
 

@@ -1,4 +1,3 @@
-from .slurm import _build_slurm_script, _submit_job, _start_async_monitor
 import bpy
 import re
 import subprocess
@@ -99,8 +98,41 @@ def _build_blender_cmd(prefs, blend_remote: str, output_remote: str, frame=None)
     return " ".join(parts)
 
 
+def _build_distributed_animation_cmd(prefs, blend_remote: str, output_remote: str):
+    return _build_blender_cmd(
+        prefs,
+        blend_remote,
+        output_remote,
+        frame="$frame",
+    )
+
+
 def _execute_render(self, context, frame=None):
+    from .slurm import _build_distributed_animation_slurm_script
+    from .slurm import _build_slurm_script
+    from .slurm import _submit_job
+    from .slurm import _start_async_monitor
+
     prefs = get_prefs(context)
+    scene = context.scene
+    nodes = max(1, int(getattr(scene, "hpcrender_nodes", 1)))
+
+    if frame is not None and nodes > 1:
+        self.report(
+            {'ERROR'},
+            "Single-frame renders are disabled when Nodes is greater than 1.",
+        )
+        return {'CANCELLED'}
+
+    if frame is None and nodes > 1:
+        frame_start = int(getattr(scene, "frame_start", 1))
+        frame_end = int(getattr(scene, "frame_end", frame_start))
+        if frame_end < frame_start:
+            self.report(
+                {'ERROR'},
+                "Frame end must be greater than or equal to frame start for distributed animation renders.",
+            )
+            return {'CANCELLED'}
 
     blend_file = bpy.data.filepath
     if not blend_file:
@@ -124,10 +156,16 @@ def _execute_render(self, context, frame=None):
     if not _scp_upload(prefs, blend_path, self):
         return {'CANCELLED'}
 
-    blender_cmd = _build_blender_cmd(
-        prefs, remote_blend, remote_out, frame=frame)
+    if frame is None and nodes > 1:
+        blender_cmd = _build_distributed_animation_cmd(
+            prefs, remote_blend, remote_out)
+        script = _build_distributed_animation_slurm_script(
+            prefs, blender_cmd, context, nodes)
+    else:
+        blender_cmd = _build_blender_cmd(
+            prefs, remote_blend, remote_out, frame=frame)
+        script = _build_slurm_script(prefs, blender_cmd, context)
 
-    script = _build_slurm_script(prefs, blender_cmd, context)
     job_id = _submit_job(prefs, script, self)
     if job_id is None:
         return {'CANCELLED'}

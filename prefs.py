@@ -27,12 +27,12 @@ class HPCRenderPreferences(bpy.types.AddonPreferences):
 
     cuda_module: bpy.props.StringProperty(
         name="CUDA module",
-        description="CUDA module to load before rendering. Run `module avail cuda` to find available versions",
+        description="CUDA module to load before rendering",
         default="cuda/12.4.0-gcc-13.2.0-shyinv2",
     )  # pyright: ignore[reportInvalidTypeForm]
 
     partition: bpy.props.StringProperty(
-        name="SLURM partition. Check available partitions with `sinfo -s`",
+        name="SLURM partition",
         default="shortq7-gpu",
     )  # pyright: ignore[reportInvalidTypeForm]
 
