@@ -43,6 +43,9 @@ def register():
     bpy.types.Scene.hpcrender_nodes = bpy.props.IntProperty(
         name="Nodes", default=1, min=1, max=9999
     )
+    bpy.types.Scene.hpcrender_batch_size = bpy.props.IntProperty(
+        name="Batch size", default=8, min=1, max=9999
+    )
     bpy.types.Scene.hpcrender_gpu_limit = bpy.props.IntProperty(
         name="GPU limit", default=0, min=0, max=9999
     )
@@ -70,6 +73,7 @@ def unregister():
     try:
         del bpy.types.Scene.hpcrender_gpus
         del bpy.types.Scene.hpcrender_nodes
+        del bpy.types.Scene.hpcrender_batch_size
         del bpy.types.Scene.hpcrender_gpu_limit
         del bpy.types.Scene.hpcrender_cpus
         del bpy.types.Scene.hpcrender_ntasks

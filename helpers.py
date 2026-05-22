@@ -15,6 +15,12 @@ CUDA_PYTHON_EXPR = (
     "bpy.context.scene.cycles.device = 'GPU'"
 )
 
+VIDEO_FILE_FORMATS = {
+    "FFMPEG",
+    "AVI_JPEG",
+    "AVI_RAW",
+}
+
 
 # https://docs.blender.org/api/current/bpy.types.WindowManager.html
 
@@ -98,13 +104,27 @@ def _build_blender_cmd(prefs, blend_remote: str, output_remote: str, frame=None)
     return " ".join(parts)
 
 
-def _build_distributed_animation_cmd(prefs, blend_remote: str, output_remote: str):
-    return _build_blender_cmd(
-        prefs,
+def _build_blender_base_cmd(prefs, blend_remote: str, output_remote: str):
+    return " ".join([
+        prefs.remote_blender,
+        "-b",
         blend_remote,
+        "-o",
         output_remote,
-        frame="$frame",
-    )
+        "-x",
+        "1",
+    ])
+
+
+def _build_distributed_animation_cmd(prefs, blend_remote: str, output_remote: str):
+    return _build_blender_base_cmd(prefs, blend_remote, output_remote)
+
+
+def _is_video_output(scene):
+    render = getattr(scene, "render", None)
+    image_settings = getattr(render, "image_settings", None)
+    file_format = getattr(image_settings, "file_format", "")
+    return file_format in VIDEO_FILE_FORMATS
 
 
 def _execute_render(self, context, frame=None):
@@ -134,6 +154,13 @@ def _execute_render(self, context, frame=None):
             )
             return {'CANCELLED'}
 
+        if _is_video_output(scene):
+            self.report(
+                {'ERROR'},
+                "Multinode animation rendering has to use an image output. Change Render Properties > Output > File Format to an image sequence format.",
+            )
+            return {'CANCELLED'}
+
     blend_file = bpy.data.filepath
     if not blend_file:
         self.report({'ERROR'}, "Please save your .blend file first.")
@@ -145,7 +172,7 @@ def _execute_render(self, context, frame=None):
 
     stem = blend_path.stem
     if frame is None:
-        out_name = f"{stem}_anim"
+        out_name = f"{stem}_anim####"
     else:
         out_name = f"{stem}_frame####"
     remote_out = str(PurePosixPath(prefs.remote_dir) / "renders" / out_name)

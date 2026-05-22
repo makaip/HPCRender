@@ -1,4 +1,5 @@
 import bpy
+from .helpers import _is_video_output
 from .prefs import get_prefs
 from .slurm import get_latest_queue_info
 
@@ -20,6 +21,8 @@ class HPC_PT_RenderPanel(bpy.types.Panel):
         col.label(text=f"Host: {prefs.host}", icon="WORLD")
         col.label(text=f"Partition: {prefs.partition}", icon="DRIVER")
         col.prop(scene, "hpcrender_nodes")
+        if nodes > 1:
+            col.prop(scene, "hpcrender_batch_size")
         col.prop(scene, "hpcrender_gpus")
         col.prop(scene, "hpcrender_ntasks")
         col.prop(scene, "hpcrender_cpus")
@@ -35,6 +38,11 @@ class HPC_PT_RenderPanel(bpy.types.Panel):
                 text="Multi-node mode renders animations only.",
                 icon="INFO",
             )
+            if _is_video_output(scene):
+                layout.label(
+                    text="Multi-node animation requires an image sequence output.",
+                    icon="ERROR",
+                )
             layout.operator("hpc.render_animation", icon="RENDER_ANIMATION")
         else:
             row = layout.row(align=True)

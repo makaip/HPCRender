@@ -8,6 +8,6 @@ Tips:
 - Check available partitions with `sinfo -s`
 - Run `module avail cuda` to find available versions
 
-Test Scene (100 frames, 1 node): 49m 22s
-
-Test Scene (25 frames, 2 nodes): 
+Test Scene
+- 30 frames, 3 nodes, 4 GPUs per node: 55 seconds. GPU unknown (probably A5500)
+- 30 frames, local: 1 hr 57 mins
