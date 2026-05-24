@@ -128,10 +128,10 @@ def _is_video_output(scene):
 
 
 def _execute_render(self, context, frame=None):
-    from .slurm import _build_distributed_animation_slurm_script
-    from .slurm import _build_slurm_script
-    from .slurm import _submit_job
-    from .slurm import _start_async_monitor
+    from .slurm.monitor import _start_async_monitor
+    from .slurm.monitor import _submit_job
+    from .slurm.scripts import _build_distributed_animation_slurm_script
+    from .slurm.scripts import _build_slurm_script
 
     prefs = get_prefs(context)
     scene = context.scene

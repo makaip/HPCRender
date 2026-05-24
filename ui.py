@@ -1,7 +1,7 @@
 import bpy
 from .helpers import _is_video_output
 from .prefs import get_prefs
-from .slurm import get_latest_queue_info
+from .slurm.state import get_latest_queue_info
 
 # https://docs.blender.org/api/current/bpy.types.Panel.html
 class HPC_PT_RenderPanel(bpy.types.Panel):
