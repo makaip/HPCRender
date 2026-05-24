@@ -1,0 +1,7 @@
+import bpy
+
+frames = [${{frame_args}}]
+{gpu_setup}for frame in frames:
+    print(f"Distributed render | Frame:{{frame}} | Node:${{SLURM_NODEID:-unknown}}")
+    bpy.context.scene.frame_set(frame)
+    bpy.ops.render.render(write_still=True)

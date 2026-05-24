@@ -1,0 +1,14 @@
+#!/bin/bash -l
+#SBATCH --nodes=1
+#SBATCH --ntasks={ntasks}
+#SBATCH --cpus-per-task={cpus}
+#SBATCH --gres=gpu:{gpus}
+#SBATCH --mem={mem}G
+#SBATCH --time={time_limit}
+#SBATCH --partition={partition}
+#SBATCH --output={remote_logs_dir}/%j-hpcrender.out
+#SBATCH --error={remote_logs_dir}/%j-hpcrender.err
+
+mkdir -p "{remote_logs_dir}"
+{module_load_snippet}
+{blender_cmd}

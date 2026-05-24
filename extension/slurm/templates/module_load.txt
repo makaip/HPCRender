@@ -1,0 +1,15 @@
+if ! command -v module >/dev/null 2>&1; then
+    for module_init in /etc/profile.d/modules.sh /usr/share/Modules/init/bash /usr/share/module/init/bash; do
+        if [ -f "$module_init" ]; then
+            # shellcheck disable=SC1090
+            source "$module_init"
+            break
+        fi
+    done
+fi
+
+if command -v module >/dev/null 2>&1; then
+    module load {cuda_module}
+else
+    echo "Warning: module command not available after shell initialization; continuing without module load."
+fi

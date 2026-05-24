@@ -1,0 +1,5 @@
+pref = bpy.context.preferences.addons['cycles'].preferences
+pref.get_devices()
+pref.compute_device_type = 'CUDA'
+[setattr(d, 'use', True) for d in pref.devices if d.type == 'CUDA']
+bpy.context.scene.cycles.device = 'GPU'
