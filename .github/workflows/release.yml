@@ -5,6 +5,8 @@ on:
     tags:
       - "v*"
 
+  workflow_dispatch:
+
 permissions:
   contents: write
 
@@ -23,10 +25,16 @@ jobs:
           zip -r build/HPCRender.zip extension \
             -x "*.git*" \
             -x "__pycache__/*" \
-            -x "*.pyc" \
-            -x "*.DS_Store"
+            -x "*.pyc"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HPCRender
+          path: build/HPCRender.zip
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: build/HPCRender.zip
