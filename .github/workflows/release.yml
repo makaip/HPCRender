@@ -4,8 +4,11 @@ on:
   push:
     tags:
       - "v*"
-
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag (e.g. v1.0.1)"
+        required: true
 
 permissions:
   contents: write
@@ -21,20 +24,14 @@ jobs:
       - name: Create extension zip
         run: |
           mkdir -p build
-
           zip -r build/HPCRender.zip extension \
             -x "*.git*" \
             -x "__pycache__/*" \
-            -x "*.pyc"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: HPCRender
-          path: build/HPCRender.zip
+            -x "*.pyc" \
+            -x "*.DS_Store"
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name || inputs.tag_name }}
           files: build/HPCRender.zip
