@@ -66,7 +66,18 @@ def _read_remote_log_tail(host: str, remote_log_path: str, max_lines: int = 80):
 
 
 def _scp_upload(prefs, local_path: Path, operator):
-    remote = f"{prefs.host}:{prefs.remote_dir}"
+    remote_dir_str = str(PurePosixPath(prefs.remote_dir))
+    
+    # add -p to ensure remote dir actually exists
+    mkdir_cmd = ["ssh", prefs.host, f"mkdir -p {remote_dir_str}"]
+    operator.report({'INFO'}, f"Creating remote directory: {' '.join(mkdir_cmd)}")
+    mkdir_result = subprocess.run(mkdir_cmd, capture_output=True, text=True)
+
+    if mkdir_result.returncode != 0:
+        operator.report({'ERROR'}, f"Failed to create remote directory:\n{mkdir_result.stderr}")
+        return False
+
+    remote = f"{prefs.host}:{remote_dir_str}/{local_path.name}"
     cmd = ["scp", str(local_path), remote]
     operator.report({'INFO'}, f"Uploading: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -79,7 +90,8 @@ def _scp_upload(prefs, local_path: Path, operator):
 
 
 def _download_remote_renders(host: str, remote_dir: str, local_dir: Path):
-    remote_renders = f"{host}:{remote_dir}/renders/."
+    remote_dir_str = str(PurePosixPath(remote_dir))
+    remote_renders = f"{host}:{remote_dir_str}/renders/."
     cmd = ["scp", "-r", remote_renders, str(local_dir)]
     result = subprocess.run(cmd, capture_output=True, text=True)
 

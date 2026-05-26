@@ -81,9 +81,14 @@ worker() {{
     done
 }}
 
+export -f render_batch
 export -f pop_frame
 export -f worker
 export python_bin
 export frame_queue
 
-srun --kill-on-bad-exit=0 --ntasks={nodes} --ntasks-per-node=1 bash -lc "worker"
+# srun's default behavior is that when the first task exits,
+# it kills all remaining tasks (even if they on other nodes)
+# therefore, we need to add --wait=0 so everything can finish
+
+srun --wait=0 --kill-on-bad-exit=0 --ntasks={nodes} --ntasks-per-node=1 bash -lc "worker"
