@@ -2,7 +2,7 @@
 
 # HPC Render
 
-A Blender extension to render frames and animations on a high performance compute cluster using SLURM.
+A Blender extension to render frames and animations on a high performance compute cluster using SLURM. Download the latest release on [GitHub Releases](https://github.com/makaip/HPCRender/releases/).
 
 ## Setup
 

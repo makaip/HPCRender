@@ -1,7 +1,6 @@
 from pathlib import Path, PurePosixPath
 
-
-_TEMPLATE_DIR = Path(__file__).resolve().parent
+_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
 
 def _render_template(template_name: str, **kwargs):
@@ -25,15 +24,14 @@ def _module_load_snippet(cuda_module: str):
     if not cuda_module:
         return ""
 
-    return _render_template("templates/module_load.txt", cuda_module=cuda_module)
+    return _render_template("module_load.txt", cuda_module=cuda_module)
 
 
 def _distributed_gpu_setup_snippet(prefs):
     if not prefs.use_gpu:
         return ""
 
-    return _render_template("templates/dist_gpu.txt")
-
+    return _render_template("dist_gpu.txt")
 
 def _build_slurm_script(prefs, blender_cmd: str, context):
     scene = context.scene
@@ -75,12 +73,12 @@ def _build_distributed_animation_slurm_script(prefs, blender_cmd: str, context, 
     )
     batch_size = max(1, int(getattr(scene, "hpcrender_batch_size", 8)))
     batch_python_script = _render_template(
-        "templates/dist_batch.txt",
+        "dist_batch.txt",
         gpu_setup=_distributed_gpu_setup_snippet(prefs),
     )
 
     return _render_template(
-        "templates/dist_anim.txt",
+        "dist_anim.txt",
         nodes=nodes,
         cpus=cpus,
         gpus=gpus,
