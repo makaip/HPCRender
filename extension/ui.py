@@ -30,7 +30,7 @@ class HPC_PT_RenderPanel(bpy.types.Panel):
         col.prop(scene, "hpcrender_time_limit")
         col.label(
             text=f"GPU render: {'on' if prefs.use_gpu else 'off'}")
-
+        
         layout.separator()
 
         if nodes > 1:

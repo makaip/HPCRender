@@ -149,6 +149,8 @@ def _execute_render(self, context, frame=None):
     scene = context.scene
     nodes = max(1, int(getattr(scene, "hpcrender_nodes", 1)))
 
+    is_video = _is_video_output(scene)
+
     if frame is not None and nodes > 1:
         self.report(
             {'ERROR'},
@@ -156,9 +158,16 @@ def _execute_render(self, context, frame=None):
         )
         return {'CANCELLED'}
 
+    if frame is not None and is_video:
+        self.report(
+            {'ERROR'},
+            "Single-frame renders must produce an image output."
+        )
+
     if frame is None and nodes > 1:
         frame_start = int(getattr(scene, "frame_start", 1))
         frame_end = int(getattr(scene, "frame_end", frame_start))
+        
         if frame_end < frame_start:
             self.report(
                 {'ERROR'},
@@ -166,7 +175,7 @@ def _execute_render(self, context, frame=None):
             )
             return {'CANCELLED'}
 
-        if _is_video_output(scene):
+        if is_video:
             self.report(
                 {'ERROR'},
                 "Multinode animation rendering has to use an image output. Change Render Properties > Output > File Format to an image sequence format.",
@@ -187,6 +196,7 @@ def _execute_render(self, context, frame=None):
         out_name = f"{stem}_anim####"
     else:
         out_name = f"{stem}_frame####"
+    
     remote_out = str(PurePosixPath(prefs.remote_dir) / "renders" / out_name)
 
     bpy.ops.file.pack_all()
