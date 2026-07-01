@@ -6,13 +6,13 @@ schema_version = "1.0.0"
 id = "HPCRender"
 version = "1.0.0"
 name = "HPCRender"
-# tagline = "This is another extension"
+tagline = "High Performance Compute (HPC) Blender rendering with SLURM."
 maintainer = "Makai P."
 # Supported types: "add-on", "theme"
 type = "add-on"
 
-# # Optional: link to documentation, support, source files, etc
-# website = "https://extensions.blender.org/add-ons/my-example-package/"
+# Optional: link to documentation, support, source files, etc
+website = "https://github.com/makaip/HPCRender"
 
 # # Optional: tag list defined by Blender and server, see:
 # # https://docs.blender.org/manual/en/dev/advanced/extensions/tags.html
