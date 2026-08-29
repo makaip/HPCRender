@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Blender Extension",
+      "type": "shell",
+      "command": "/Applications/Blender.app/Contents/MacOS/Blender",
+      "args": [
+        "--command",
+        "extension",
+        "build",
+        "--source-dir",
+        "HPCRender"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

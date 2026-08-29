@@ -1,0 +1,2 @@
+blender --command extension validate HPCRender
+blender --command extension build --source-dir HPCRender

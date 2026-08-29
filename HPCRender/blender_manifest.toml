@@ -3,10 +3,10 @@ schema_version = "1.0.0"
 
 # Example of manifest file for a Blender extension
 # Change the values according to your extension
-id = "HPCRender"
+id = "hpcrender"
 version = "1.0.0"
 name = "HPCRender"
-tagline = "High Performance Compute (HPC) Blender rendering with SLURM."
+tagline = "High Performance Compute (HPC) Blender rendering with SLURM"
 maintainer = "Makai P."
 # Supported types: "add-on", "theme"
 type = "add-on"
@@ -62,7 +62,7 @@ license = [
 
 [permissions]
 # network = "Need to sync motion-capture data to server"
-files = "To transfer data from your local device to the designated supercomputer"
+files = "To transfer data from your device to the supercomputer"
 # clipboard = "Copy and paste bone transforms"
 
 # Optional: advanced build settings.
