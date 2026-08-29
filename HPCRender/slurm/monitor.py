@@ -22,11 +22,11 @@ TERMINAL_STATES = {
 }
 
 
-def _submit_job(prefs, slurm_script: str, operator):
+def _submit_job(host: str, slurm_script: str, operator):
     # escape single quotes in the script so we can wrap it in $'...'
     escaped = slurm_script.replace("\\", "\\\\").replace("'", "\\'")
     ssh_cmd = [
-        "ssh", prefs.host,
+        "ssh", host,
         f"echo $'{escaped}' | sbatch",
     ]
 

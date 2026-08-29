@@ -33,7 +33,7 @@ def _distributed_gpu_setup_snippet(prefs):
 
     return _render_template("dist_gpu.txt")
 
-def _build_slurm_script(prefs, blender_cmd: str, context):
+def _build_slurm_script(prefs, remote_dir: str, blender_cmd: str, context):
     scene = context.scene
     ntasks = getattr(scene, "hpcrender_ntasks", 1)
     cpus = getattr(scene, "hpcrender_cpus", 1)
@@ -41,7 +41,7 @@ def _build_slurm_script(prefs, blender_cmd: str, context):
                    prefs.gpus if hasattr(prefs, "gpus") else 1)
     mem = getattr(scene, "hpcrender_mem", 64)
     time_limit = getattr(scene, "hpcrender_time_limit", 21600)
-    remote_logs_dir = str(PurePosixPath(prefs.remote_dir) / "slurm-logs")
+    remote_logs_dir = str(PurePosixPath(remote_dir) / "slurm-logs")
 
     return _render_template(
         "slurm.txt",
@@ -57,14 +57,14 @@ def _build_slurm_script(prefs, blender_cmd: str, context):
     )
 
 
-def _build_distributed_animation_slurm_script(prefs, blender_cmd: str, context, nodes: int):
+def _build_distributed_animation_slurm_script(prefs, remote_dir: str, blender_cmd: str, context, nodes: int):
     scene = context.scene
     cpus = getattr(scene, "hpcrender_cpus", 1)
     gpus = getattr(scene, "hpcrender_gpus",
                    prefs.gpus if hasattr(prefs, "gpus") else 1)
     mem = getattr(scene, "hpcrender_mem", 64)
     time_limit = getattr(scene, "hpcrender_time_limit", 21600)
-    remote_logs_dir = str(PurePosixPath(prefs.remote_dir) / "slurm-logs")
+    remote_logs_dir = str(PurePosixPath(remote_dir) / "slurm-logs")
     frame_start = int(getattr(scene, "frame_start", 1))
     frame_end = int(getattr(scene, "frame_end", frame_start))
     frame_step = max(1, int(getattr(scene, "frame_step", 1)))

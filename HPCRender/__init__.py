@@ -3,7 +3,7 @@
 import bpy
 
 from .exec import HPC_OT_DownloadRenders, HPC_OT_RenderAnimation, HPC_OT_RenderFrame
-from .prefs import HPCRenderPreferences, get_prefs
+from .prefs import HPCRenderPreferences, _destination_get, _destination_set, get_prefs
 from .ui import HPC_PT_RenderPanel
 
 bl_info = {
@@ -37,6 +37,14 @@ def register():
     for cls in CLASSES:
         bpy.utils.register_class(cls)
 
+    bpy.types.Scene.hpcrender_destination = bpy.props.StringProperty(
+        name="Destination",
+        description=(
+            "SSH destination for this scene's renders: user@host:/remote/project/dir."
+        ),
+        get=_destination_get,
+        set=_destination_set,
+    )
     bpy.types.Scene.hpcrender_gpus = bpy.props.IntProperty(
         name="GPUs", default=4, min=1, max=9999
     )
@@ -71,6 +79,7 @@ def unregister():
 
     # remove scene-level properties
     try:
+        del bpy.types.Scene.hpcrender_destination
         del bpy.types.Scene.hpcrender_gpus
         del bpy.types.Scene.hpcrender_nodes
         del bpy.types.Scene.hpcrender_batch_size

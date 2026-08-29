@@ -18,7 +18,7 @@ class HPC_PT_RenderPanel(bpy.types.Panel):
         nodes = getattr(scene, "hpcrender_nodes", 1)
 
         col = layout.column(align=True)
-        col.label(text=f"Host: {prefs.host}", icon="WORLD")
+        col.prop(scene, "hpcrender_destination", text="Destination", icon="WORLD")
         col.label(text=f"Partition: {prefs.partition}", icon="DRIVER")
         col.prop(scene, "hpcrender_nodes")
         if nodes > 1:

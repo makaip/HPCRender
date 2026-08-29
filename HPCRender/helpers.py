@@ -4,7 +4,7 @@ import subprocess
 import time
 from pathlib import Path, PurePosixPath
 
-from .prefs import get_prefs
+from .prefs import get_destination, get_prefs
 
 CUDA_PYTHON_EXPR = (
     "import bpy; "
@@ -65,11 +65,11 @@ def _read_remote_log_tail(host: str, remote_log_path: str, max_lines: int = 80):
     return result.stdout.strip()
 
 
-def _scp_upload(prefs, local_path: Path, operator):
-    remote_dir_str = str(PurePosixPath(prefs.remote_dir))
-    
+def _scp_upload(host: str, remote_dir: str, local_path: Path, operator):
+    remote_dir_str = str(PurePosixPath(remote_dir))
+
     # add -p to ensure remote dir actually exists
-    mkdir_cmd = ["ssh", prefs.host, f"mkdir -p {remote_dir_str}"]
+    mkdir_cmd = ["ssh", host, f"mkdir -p {remote_dir_str}"]
     operator.report({'INFO'}, f"Creating remote directory: {' '.join(mkdir_cmd)}")
     mkdir_result = subprocess.run(mkdir_cmd, capture_output=True, text=True)
 
@@ -77,7 +77,7 @@ def _scp_upload(prefs, local_path: Path, operator):
         operator.report({'ERROR'}, f"Failed to create remote directory:\n{mkdir_result.stderr}")
         return False
 
-    remote = f"{prefs.host}:{remote_dir_str}/{local_path.name}"
+    remote = f"{host}:{remote_dir_str}/{local_path.name}"
     cmd = ["scp", str(local_path), remote]
     operator.report({'INFO'}, f"Uploading: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -149,6 +149,12 @@ def _execute_render(self, context, frame=None):
     scene = context.scene
     nodes = max(1, int(getattr(scene, "hpcrender_nodes", 1)))
 
+    try:
+        host, remote_dir = get_destination(context)
+    except ValueError as exc:
+        self.report({'ERROR'}, str(exc))
+        return {'CANCELLED'}
+
     is_video = _is_video_output(scene)
 
     if frame is not None and nodes > 1:
@@ -189,7 +195,7 @@ def _execute_render(self, context, frame=None):
 
     blend_path = Path(blend_file)
     blend_name = blend_path.name
-    remote_blend = str(PurePosixPath(prefs.remote_dir) / blend_name)
+    remote_blend = str(PurePosixPath(remote_dir) / blend_name)
 
     stem = blend_path.stem
     if frame is None:
@@ -197,33 +203,33 @@ def _execute_render(self, context, frame=None):
     else:
         out_name = f"{stem}_frame####"
     
-    remote_out = str(PurePosixPath(prefs.remote_dir) / "renders" / out_name)
+    remote_out = str(PurePosixPath(remote_dir) / "renders" / out_name)
 
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_mainfile()
 
-    if not _scp_upload(prefs, blend_path, self):
+    if not _scp_upload(host, remote_dir, blend_path, self):
         return {'CANCELLED'}
 
     if frame is None and nodes > 1:
         blender_cmd = _build_distributed_animation_cmd(
             prefs, remote_blend, remote_out)
         script = _build_distributed_animation_slurm_script(
-            prefs, blender_cmd, context, nodes)
+            prefs, remote_dir, blender_cmd, context, nodes)
     else:
         blender_cmd = _build_blender_cmd(
             prefs, remote_blend, remote_out, frame=frame)
-        script = _build_slurm_script(prefs, blender_cmd, context)
+        script = _build_slurm_script(prefs, remote_dir, blender_cmd, context)
 
-    job_id = _submit_job(prefs, script, self)
+    job_id = _submit_job(host, script, self)
     if job_id is None:
         return {'CANCELLED'}
 
     local_dir = _get_local_output_dir(context)
     local_dir.mkdir(parents=True, exist_ok=True)
     _start_async_monitor(
-        prefs.host,
-        prefs.remote_dir,
+        host,
+        remote_dir,
         job_id,
         local_dir,
         prefs.poll_interval_seconds,

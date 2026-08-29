@@ -7,22 +7,19 @@ ADDON_ID = __package__ or __name__.partition(".")[0]
 class HPCRenderPreferences(bpy.types.AddonPreferences):
     bl_idname = ADDON_ID
 
-    host: bpy.props.StringProperty(
-        name="SSH Host",
-        description="user@hostname for the cluster login node",
-        default="userid@login.hpc.university.edu",
+    default_destination: bpy.props.StringProperty(
+        name="Default Destination",
+        description=(
+            "Default SSH destination for new scenes, in the form "
+            "user@host:/remote/project/dir."
+        ),
+        default="userid@login.hpc.university.edu:/mnt/beegfs/home/youruser/etc.",
     )  # pyright: ignore[reportInvalidTypeForm]
 
     remote_blender: bpy.props.StringProperty(
         name="Blender path (cluster)",
         description="Absolute path to the blender binary on the cluster",
-        default="/mnt/beegfs/home/youruser/Desktop/blender-4.5.5-linux-x64/blender",
-    )  # pyright: ignore[reportInvalidTypeForm]
-
-    remote_dir: bpy.props.StringProperty(
-        name="Remote project dir",
-        description="Directory on the cluster where the .blend file will be uploaded",
-        default="/mnt/beegfs/home/youruser/etc.",
+        default="/mnt/beegfs/home/youruser/Desktop/blender-5.0.0-linux-x64/blender",
     )  # pyright: ignore[reportInvalidTypeForm]
 
     cuda_module: bpy.props.StringProperty(
@@ -52,9 +49,8 @@ class HPCRenderPreferences(bpy.types.AddonPreferences):
     def draw(self, context):
         layout = self.layout
 
-        layout.prop(self, "host")
+        layout.prop(self, "default_destination")
         layout.prop(self, "remote_blender")
-        layout.prop(self, "remote_dir")
         layout.prop(self, "cuda_module")
         layout.prop(self, "partition")
 
@@ -66,4 +62,41 @@ class HPCRenderPreferences(bpy.types.AddonPreferences):
 
 def get_prefs(context):
     return context.preferences.addons[ADDON_ID].preferences
+
+
+def _destination_get(self):
+    raw = self.get("hpcrender_destination_raw", "")
+    if raw:
+        return raw
+    try:
+        return bpy.context.preferences.addons[ADDON_ID].preferences.default_destination
+    except Exception:
+        return ""
+
+
+def _destination_set(self, value):
+    self["hpcrender_destination_raw"] = value
+
+
+def _parse_destination(destination: str):
+    """Split a 'user@host:/remote/dir' string into (host, remote_dir)."""
+    destination = (destination or "").strip()
+    if ":" not in destination:
+        raise ValueError(
+            f"Destination must be in the form user@host:/remote/dir, got: {destination!r}"
+        )
+    host, remote_dir = destination.split(":", 1)
+    host = host.strip()
+    remote_dir = remote_dir.strip()
+    if not host or not remote_dir:
+        raise ValueError(
+            f"Destination must be in the form user@host:/remote/dir, got: {destination!r}"
+        )
+    return host, remote_dir
+
+
+def get_destination(context):
+    scene = context.scene
+    destination = getattr(scene, "hpcrender_destination", "") or get_prefs(context).default_destination
+    return _parse_destination(destination)
 

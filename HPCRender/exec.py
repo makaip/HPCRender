@@ -2,7 +2,7 @@ import bpy
 import subprocess
 
 from .helpers import _download_remote_renders, _execute_render, _get_local_output_dir
-from .prefs import get_prefs
+from .prefs import get_destination, get_prefs
 
 class HPC_OT_RenderFrame(bpy.types.Operator):
     """Render current frame on HPC cluster"""
@@ -35,7 +35,12 @@ class HPC_OT_DownloadRenders(bpy.types.Operator):
     bl_label = "Download Renders from HPC"
 
     def execute(self, context):
-        prefs = get_prefs(context)
+        try:
+            host, remote_dir = get_destination(context)
+        except ValueError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
         blend_file = bpy.data.filepath
 
         if not blend_file:
@@ -46,7 +51,7 @@ class HPC_OT_DownloadRenders(bpy.types.Operator):
         local_dir.mkdir(parents=True, exist_ok=True)
 
         self.report({'INFO'}, f"Downloading renders to {local_dir}...")
-        ok, error = _download_remote_renders(prefs.host, prefs.remote_dir, local_dir)
+        ok, error = _download_remote_renders(host, remote_dir, local_dir)
 
         if not ok:
             self.report({'ERROR'}, f"Download failed:\n{error}")
